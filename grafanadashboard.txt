@@ -1,0 +1,172 @@
+NODE JS EXPORTER ON ALL SERVERS 
+
+
+# Node Exporter Setup
+sudo useradd --no-create-home --shell /bin/false node_exporter
+
+wget https://github.com/prometheus/node_exporter/releases/download/v1.8.0/node_exporter-1.8.0.linux-amd64.tar.gz
+
+tar -xvzf node_exporter-1.8.0.linux-amd64.tar.gz
+sudo cp node_exporter-1.8.0.linux-amd64/node_exporter /usr/local/bin/
+
+sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
+
+sudo tee /etc/systemd/system/node_exporter.service > /dev/null <<EOF
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=node_exporter
+ExecStart=/usr/local/bin/node_exporter
+
+[Install]
+WantedBy=default.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+
+
+
+ONLY ON HOST SERVER INSTALL THIS
+
+
+sudo useradd --no-create-home --shell /bin/false prometheus
+
+wget https://github.com/prometheus/prometheus/releases/download/v2.52.0/prometheus-2.52.0.linux-amd64.tar.gz
+
+tar -xvzf prometheus-2.52.0.linux-amd64.tar.gz
+cd prometheus-2.52.0.linux-amd64
+
+sudo cp prometheus promtool /usr/local/bin/
+sudo mkdir /etc/prometheus /var/lib/prometheus
+sudo cp -r consoles console_libraries /etc/prometheus
+sudo chown -R prometheus:prometheus /etc/prometheus /var/lib/prometheus /usr/local/bin/prometheus /usr/local/bin/promtool
+
+
+sudo nano /etc/prometheus/prometheus.yml
+
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'node-exporters'
+    static_configs:
+      - targets:
+          - 'private-1-private-ip:9100'
+          - 'private-2-private-ip:9100'
+          - 'private-3-private-ip:9100'
+
+
+
+
+######START PROMITHEUS####
+
+sudo tee /etc/systemd/system/prometheus.service > /dev/null <<EOF
+[Unit]
+Description=Prometheus
+After=network.target
+
+[Service]
+User=prometheus
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus/ \
+  --web.console.templates=/etc/prometheus/consoles \
+  --web.console.libraries=/etc/prometheus/console_libraries
+
+[Install]
+WantedBy=default.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl start prometheus
+sudo systemctl enable prometheus
+
+
+
+
+
+####only on Private 1 OR HOST####
+
+
+sudo tee /etc/yum.repos.d/grafana.repo<<EOF
+[grafana]
+name=Grafana OSS
+baseurl=https://packages.grafana.com/oss/rpm
+repo_gpgcheck=1
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.grafana.com/gpg.key
+EOF
+
+sudo yum install grafana -y
+
+sudo systemctl start grafana-server
+sudo systemctl enable grafana-server
+
+
+
+STEP 5 — APPLICATION LOAD BALANCER
+Create Target Group
+Target type: Instance
+
+Protocol: HTTP
+
+Port: 3000
+
+Register only Private 1
+
+
+Create Load Balancer
+Type: Application Load Balancer
+
+Scheme: Internet-facing
+
+Listener: HTTP on port 80
+
+Forward to the Target Group
+
+
+
+🔧 STEP 1 — Add Prometheus Data Source
+1️⃣ On left sidebar → go to Connections → Data sources
+2️⃣ Click Add data source
+3️⃣ Select Prometheus
+4️⃣ In HTTP URL enter:
+
+arduino
+Copy
+Edit
+http://localhost:9090
+👉 (Since Prometheus and Grafana are running on same Private 1 server)
+
+5️⃣ Click Save & Test
+✅ You should see:
+Data source is working
+
+
+
+
+🔧 STEP 2 — Import Node Exporter Dashboard
+This is where you will see all 3 private servers.
+
+1️⃣ Left Sidebar → Dashboards → Import
+
+2️⃣ In Import via grafana.com
+Enter ID: 1860
+(This is the most popular "Node Exporter Full" dashboard)
+
+3️⃣ Click Load
+
+4️⃣ Select your Prometheus data source (the one you just created).
+
+5️⃣ Click Import
+
+✅ Done — your dashboard is live now.
+
+
+
