@@ -1,0 +1,1 @@
+ssh -i "aleuday.pem" -L 3306:database-1.cvo8aieqid1x.ap-south-1.rds.amazonaws.com:3306 ec2-user@13.232.103.132
